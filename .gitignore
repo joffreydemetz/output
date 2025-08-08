@@ -1,0 +1,5 @@
+composer.lock
+package-lock.json
+.phpunit.cache/
+vendor/
+examples/output.txt
