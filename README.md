@@ -1,18 +1,17 @@
 # JDZ Output
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 A lightweight PHP library for handling process output with different verbosity levels and formatting options. Perfect for CLI applications, logging, and process monitoring.
 
 ## Features
 
 - **Multiple output types**: step, info, warn, error, and dump messages
 - **Dual storage system**: Filtered output based on verbosity + complete message dump
-- **Verbosity control**: Fine-grained filtering with hierarchical levels
+- **Verbosity control**: Fine-grained filtering with hierarchical levels using PHP 8.1+ enums
 - **CLI detection**: Automatically detects CLI environment and outputs to console
 - **File export**: Save filtered or complete output to files for logging
 - **Tagged messages**: All messages are automatically tagged and aligned
 - **String conversion**: Access both filtered and complete output programmatically
+- **Type-safe**: Uses backed enums for type safety and better IDE support
 
 ## Installation
 
@@ -29,298 +28,322 @@ composer require jdz/output
 ## Quick Start
 
 ```php
-<?php
-
-require_once 'vendor/autoload.php';
-
 use JDZ\Output\Output;
+use JDZ\Output\Verbosity;
 
-// Create an output instance
+// Create output instance (auto-detects CLI mode)
 $output = new Output();
 
-// Set verbosity level (optional)
-$output->setVerbosity(Output::VERBOSITY_ALL);
-
-// Add different types of messages
+// Add messages
 $output->step('Starting process...');
-$output->info('Process initialized successfully');
-$output->warn('Configuration file not found, using defaults');
-$output->error('Failed to connect to database');
-$output->dump('Debug information: variable state');
+$output->info('Processing 100 records');
+$output->warn('Skipping invalid record');
+$output->error('Database connection failed');
+$output->dump('Debug info: memory usage');
 
-// Get output as string
-echo $output->toString();
+// Control verbosity
+$output->setVerbosity(Verbosity::WARN);
 
-// Or use the object directly (calls __toString())
-echo $output;
+// Get output
+echo $output->toString(false); // Filtered based on verbosity
+echo $output->toString(true);  // All messages regardless of verbosity
+
+// Save to file
+$output->toFile('output.log');        // Filtered output
+$output->toFile('complete.log', true); // Complete output
 ```
 
 ## Verbosity Levels
 
-The library supports different verbosity levels to control which messages are displayed in filtered output. All messages are always stored internally regardless of verbosity level.
+The library uses a PHP 8.1+ backed enum for type-safe verbosity levels. All messages are always stored internally regardless of verbosity level.
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `VERBOSITY_NONE` | 0 | No messages in filtered output |
-| `VERBOSITY_STEP` | 1 | Only step messages |
-| `VERBOSITY_ERROR` | 4 | Step and error messages |
-| `VERBOSITY_WARN` | 8 | Step, error, and warning messages |
-| `VERBOSITY_INFO` | 16 | Step, error, warning, and info messages |
-| `VERBOSITY_ALL` | 32 | All messages including debug/dump |
+### Enum Cases
+
+| Enum Case | Value | Description |
+|-----------|-------|-------------|
+| `Verbosity::NONE` | 0 | No messages in filtered output |
+| `Verbosity::STEP` | 1 | Only step messages |
+| `Verbosity::ERROR` | 4 | Step and error messages |
+| `Verbosity::WARN` | 8 | Step, error, and warning messages |
+| `Verbosity::INFO` | 16 | Step, error, warning, and info messages |
+| `Verbosity::ALL` | 32 | All messages including debug/dump |
+
+### Usage
 
 ```php
+use JDZ\Output\Output;
+use JDZ\Output\Verbosity;
+
 $output = new Output();
 
-// Show only steps and errors
-$output->setVerbosity(Output::VERBOSITY_ERROR);
+// Using enum (recommended - type-safe)
+$output->setVerbosity(Verbosity::WARN);
+$output->setVerbosity(Verbosity::INFO);
+$output->setVerbosity(Verbosity::ALL); // default
 
-// Show all messages (default)
-$output->setVerbosity(Output::VERBOSITY_ALL);
+// Using integer value (backward compatible)
+$output->setVerbosity(8);  // Same as Verbosity::WARN
 
-// Get filtered output based on verbosity
-echo $output->toString(false); // or just $output->toString()
+// Using constants (backward compatible)
+$output->setVerbosity(Verbosity::WARN); // Same as 8
 
-// Get ALL messages regardless of verbosity
-echo $output->toString(true);
+// Get current verbosity level
+$level = $output->getVerbosity(); // Returns Verbosity enum
+echo $level->name; // "WARN"
+echo $level->value; // 8
+echo $level->description(); // "Step, error, and warning messages"
+
+// Check verbosity hierarchy
+if (Verbosity::INFO->includes(Verbosity::WARN)) {
+    // INFO level includes WARN level
+}
+```
+
+### Verbosity Hierarchy
+
+Higher verbosity levels include all lower level messages:
+
+```
+NONE (0)
+  ↓
+STEP (1)
+  ↓
+ERROR (4)  ← includes STEP
+  ↓
+WARN (8)   ← includes STEP + ERROR
+  ↓
+INFO (16)  ← includes STEP + ERROR + WARN
+  ↓
+ALL (32)   ← includes everything
+```
+
+### Enum Methods
+
+```php
+// Check if one level includes another
+Verbosity::INFO->includes(Verbosity::WARN);  // true
+Verbosity::WARN->includes(Verbosity::INFO);  // false
+
+// Get human-readable description
+Verbosity::WARN->description(); 
+// Returns: "Step, error, and warning messages"
+
+// Get all cases
+foreach (Verbosity::cases() as $level) {
+    echo $level->name . ": " . $level->description() . "\n";
+}
+
+// Create from integer
+$level = Verbosity::from(8);      // Returns Verbosity::WARN
+$level = Verbosity::tryFrom(999); // Returns null for invalid value
 ```
 
 ## Message Types
 
-### Step Messages
-Use for major process milestones:
+The Output class provides methods for different types of messages, each tagged appropriately.
 
 ```php
+// Step Messages (verbosity >= Verbosity::STEP)
 $output->step('Initializing application...');
-$output->step('Processing data...');
-$output->step('Finalizing output...');
-```
+// Output: [STEP]  Initializing application...
 
-### Info Messages
-Use for general information:
-
-```php
+// Info Messages (verbosity >= Verbosity::INFO)
 $output->info('Found 150 records to process');
-$output->info('Configuration loaded successfully');
-```
+// Output: [INFO]  Found 150 records to process
 
-### Warning Messages
-Use for non-critical issues:
-
-```php
+// Warning Messages (verbosity >= Verbosity::WARN)
 $output->warn('Using default configuration');
-$output->warn('Cache directory not writable');
-```
+// Output: [WARN]  Using default configuration
 
-### Error Messages
-Use for errors and failures:
-
-```php
+// Error Messages (verbosity >= Verbosity::ERROR)
 $output->error('Database connection failed');
-$output->error('Invalid input parameters');
-```
+// Output: [ERROR] Database connection failed
 
-### Debug/Dump Messages
-Use for debugging and detailed information:
-
-```php
+// Debug/Dump Messages (verbosity >= Verbosity::ALL)
 $output->dump('Current memory usage: 45MB');
-$output->dump('Processing file: /path/to/file.txt');
+// Output: [DUMP]  Current memory usage: 45MB
+
+// Custom Tagged Messages
+$output->add('Custom log entry', 'custom');
+// Output: [CUSTOM]Custom log entry
 ```
 
 ## CLI Mode
 
-When running in CLI mode (command line interface), the Output class automatically detects the environment and outputs messages directly to the console in real-time, **but only for messages that pass the verbosity filter**. All messages are still stored internally regardless of verbosity.
+The library automatically detects if it's running in CLI mode and outputs messages to the console in real-time.
 
 ```php
-// In CLI, this will echo messages immediately if they pass verbosity filter
-$output = new Output(); // Automatically detects CLI mode
-$output->setVerbosity(Output::VERBOSITY_WARN);
+// Auto-detect mode
+$output = new Output(); // Will detect CLI automatically
 
-$output->step('Starting process');    // Echoed immediately + stored
-$output->info('Processing data');     // Only stored (below WARN level)  
-$output->warn('Memory low');          // Echoed immediately + stored
-$output->error('Connection failed');  // Echoed immediately + stored
+// Force CLI mode
+$output = new Output('cli');
 
-// You can still access all messages programmatically:
-echo $output->toString(true);  // Gets all messages including info
+// Force non-CLI mode (no console output)
+$output = new Output('');
+
+// Only messages that pass the verbosity filter are echoed to CLI
+// But all messages are stored internally regardless
+```
+
+## Dual Storage System
+
+One of the key features is the dual storage system:
+
+1. **Filtered Output** (`$output` array): Contains only messages that pass the verbosity filter
+2. **Complete Dump** (`$dump` array): Contains ALL messages regardless of verbosity
+
+```php
+$output = new Output('');
+$output->setVerbosity(Verbosity::WARN);
+
+$output->step('Step 1');   // Will be included
+$output->error('Error 1'); // Will be included
+$output->warn('Warning 1'); // Will be included
+$output->info('Info 1');    // Will NOT be included in filtered output
+$output->dump('Debug 1');   // Will NOT be included in filtered output
+
+// Get filtered output (respects verbosity)
+$filtered = $output->toString(false);
+// Contains: STEP, ERROR, WARN
+
+// Get complete output (ignores verbosity)
+$complete = $output->toString(true);
+// Contains: STEP, ERROR, WARN, INFO, DUMP
 ```
 
 ## File Output
 
-Save output to files for logging purposes. You can save either filtered output or complete message dump:
+Save output to files with optional verbosity filtering:
 
 ```php
-$output = new Output();
-$output->setVerbosity(Output::VERBOSITY_WARN);
+$output = new Output('');
+$output->setVerbosity(Verbosity::WARN);
 
-$output->step('Process started');
-$output->info('Data processed successfully');
-$output->warn('Minor issue detected');
-$output->dump('Debug: processing 1000 records');
+$output->step('Processing started');
+$output->info('Record 1 processed');
+$output->warn('Skipped invalid record');
+$output->error('Failed to process record 5');
+$output->dump('Memory usage: 45MB');
 
-// Save filtered output (based on verbosity level)
-$output->toFile('/path/to/filtered-log.txt', false);
+// Save filtered output (respects verbosity level)
+$output->toFile('filtered.log', false);
+// File contains: step, error, warn messages only
 
-// Save ALL messages regardless of verbosity
-$output->toFile('/path/to/complete-log.txt', true);
+// Save complete output (all messages)
+$output->toFile('complete.log', true);
+// File contains: all messages including info and dump
 ```
 
-**Filtered log** (`VERBOSITY_WARN`) will contain:
+**File contents example:**
+
+`filtered.log`:
 ```
-[STEP]  Process started
-[WARN]  Minor issue detected
+[STEP]  Processing started
+[WARN]  Skipped invalid record
+[ERROR] Failed to process record 5
 ```
 
-**Complete log** will contain:
+`complete.log`:
 ```
-[STEP]  Process started
-[INFO]  Data processed successfully
-[WARN]  Minor issue detected
-[DUMP]  Debug: processing 1000 records
+[STEP]  Processing started
+[INFO]  Record 1 processed
+[WARN]  Skipped invalid record
+[ERROR] Failed to process record 5
+[DUMP]  Memory usage: 45MB
 ```
 
 ## Advanced Usage
 
 ### Dual Output Access
 
-The library maintains two separate message stores:
-
 ```php
-$output = new Output();
-$output->setVerbosity(Output::VERBOSITY_WARN);
+$output = new Output('');
+$output->setVerbosity(Verbosity::ERROR);
 
-$output->step('Starting process');
-$output->info('Processing 100 items');  // Won't appear in filtered output
-$output->warn('Low memory warning');
-$output->dump('Debug info');            // Won't appear in filtered output
+$output->step('Step 1');
+$output->error('Error occurred');
+$output->warn('Warning message');
+$output->info('Info message');
+$output->dump('Debug data');
 
-// Get filtered output (respects verbosity)
-$filtered = $output->toString(false);
-echo $filtered;
-// Output:
-// [STEP]  Starting process
-// [WARN]  Low memory warning
+// Method 1: toString() with parameter
+$filtered = $output->toString(false); // Only STEP and ERROR
+$complete = $output->toString(true);  // All messages
 
-// Get complete output (all messages)
-$complete = $output->toString(true);
-echo $complete;
-// Output:
-// [STEP]  Starting process  
-// [INFO]  Processing 100 items
-// [WARN]  Low memory warning
-// [DUMP]  Debug info
+// Method 2: __toString() always returns filtered
+$filtered = (string) $output; // Only STEP and ERROR
 ```
 
-### Custom Message Addition
+### Custom Tags
 
-You can add messages with custom tags:
-
-```php
-$output = new Output();
-$output->add('Custom message', 'custom');
-$output->add('System status', 'status');
-
-// Custom tags get proper formatting:
-// [CUSTOM]Custom message
-// [STATUS]System status
-```
-
-### Fluent Interface
-
-The `setVerbosity()` method returns the instance for method chaining:
+Add custom tagged messages that don't fit standard categories:
 
 ```php
-$output = new Output();
-$result = $output->setVerbosity(Output::VERBOSITY_ALL);
-// $result is the same instance as $output
+$output->add('Database connected successfully', 'db');
+// Output: [DB]    Database connected successfully
 
-// You can chain if you prefer:
-$output->setVerbosity(Output::VERBOSITY_INFO);
-$output->step('Processing...');
-```
+$output->add('Cache cleared', 'cache');
+// Output: [CACHE] Cache cleared
 
-### Empty Output Handling
-
-```php
-$output = new Output();
-
-// Check if any messages were added
-echo $output->toString();        // Returns empty string if no messages
-echo $output->toString(true);    // Returns empty string if no messages
-
-if (empty($output->toString())) {
-    echo "No output generated";
-}
+$output->add('Custom event triggered', 'event');
+// Output: [EVENT] Custom event triggered
 ```
 
 ### Understanding Message Formatting
 
-All messages are formatted with consistent padding for better readability:
+All tags are padded to 8 characters for consistent alignment:
 
 ```php
-$output = new Output();
-$output->step('Step message');      // [STEP]  Step message
-$output->error('Error occurred');   // [ERROR] Error occurred  
-$output->info('Information');       // [INFO]  Information
-$output->warn('Warning message');   // [WARN]  Warning message
-$output->dump('Debug data');        // [DUMP]  Debug data
+[STEP]  Message  // 4-char tag + 2 spaces + message
+[INFO]  Message  // 4-char tag + 2 spaces + message
+[WARN]  Message  // 4-char tag + 2 spaces + message
+[ERROR] Message  // 5-char tag + 1 space + message
+[DUMP]  Message  // 4-char tag + 2 spaces + message
+[CUSTOM]Message  // 6-char tag + 0 spaces + message
 ```
 
-Tags are padded to 8 characters for consistent alignment.
+## Examples
 
-## Error Handling
+See the [examples](examples/) directory for detailed examples:
 
-The library throws exceptions for file operation errors:
-
-```php
-try {
-    $output->toFile('/invalid/path/file.txt');
-} catch (\RuntimeException $e) {
-    echo "Error: " . $e->getMessage();
-}
-```
+- `example.php` - Complete usage demonstration with all verbosity levels
 
 ## Testing
 
 Run the test suite:
 
 ```bash
+# Run all tests
 composer test
+
+# Run with coverage
+composer test -- --coverage-html coverage
+
+# Run specific test file
+vendor/bin/phpunit tests/OutputTest.php
+vendor/bin/phpunit tests/VerbosityTest.php
+
+# Run with detailed output
+vendor/bin/phpunit --testdox
 ```
-
-Or using PHPUnit directly:
-
-```bash
-vendor/bin/phpunit
-```
-
-## Examples
-
-See the `examples/` directory for more usage examples:
-
-```bash
-composer run example
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
 This library is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Author
+## Changelog
 
-**Joffrey Demetz**
-- Email: joffrey.demetz@gmail.com
-- Website: [https://joffreydemetz.com](https://joffreydemetz.com)
-- Package Homepage: [https://jdz.joffreydemetz.com/output/](https://jdz.joffreydemetz.com/output/)
+### Version 2.0.0
+- Added PHP 8.1+ backed enum for type-safe verbosity levels
+- Added `Verbosity::includes()` method for hierarchy checking
+- Added `Verbosity::description()` method for human-readable descriptions
+- Improved dual storage system documentation
+- Enhanced test coverage
 
-## Support
-
-If you encounter any issues or have questions, please [open an issue](https://github.com/joffreydemetz/output/issues) on GitHub.
+### Version 1.0.0
+- Initial release
+- Basic output handling with verbosity levels
+- CLI detection and console output
+- File export functionality
+- Tagged messages with alignment

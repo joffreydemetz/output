@@ -3,9 +3,10 @@
 require_once realpath(__DIR__ . '/../vendor/autoload.php');
 
 use JDZ\Output\Output;
+use JDZ\Output\Verbosity;
 
 $output = new Output();
-$output->setVerbosity(Output::VERBOSITY_ALL);
+$output->setVerbosity(Verbosity::ALL);
 
 // Example usage of the output methods
 $output->step('Starting process...');

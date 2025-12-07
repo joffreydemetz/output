@@ -1,8 +1,9 @@
 {
     "name": "jdz/output",
     "type": "library",
-    "description": "Used to output process information",
+    "description": "CLI Output Library",
     "keywords": [
+        "JDZ",
         "output",
         "cli"
     ],
@@ -16,6 +17,7 @@
             "role": "Lead"
         }
     ],
+    "minimum-stability": "stable",
     "require": {
         "php": ">=8.1"
     },
@@ -33,11 +35,7 @@
         }
     },
     "scripts": {
-        "test": [
-            "phpunit"
-        ],
-        "example": [
-            "php examples/example.php"
-        ]
+        "test": "phpunit --colors=always --testdox",
+        "test-coverage": "phpunit --coverage-html coverage"
     }
 }
