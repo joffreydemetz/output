@@ -3,6 +3,7 @@
 namespace JDZ\Output\Tests;
 
 use JDZ\Output\Output;
+use JDZ\Output\Verbosity;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -62,24 +63,6 @@ class OutputTest extends TestCase
         $this->assertEquals('[INFO]  Test message 2', $lines[1]);
     }
 
-    public function testVerbosityConstants(): void
-    {
-        $this->assertEquals(0, Output::VERBOSITY_NONE);
-        $this->assertEquals(1, Output::VERBOSITY_STEP);
-        $this->assertEquals(4, Output::VERBOSITY_ERROR);
-        $this->assertEquals(8, Output::VERBOSITY_WARN);
-        $this->assertEquals(16, Output::VERBOSITY_INFO);
-        $this->assertEquals(32, Output::VERBOSITY_ALL);
-    }
-
-    public function testFluentInterface(): void
-    {
-        $result = $this->output->setVerbosity(Output::VERBOSITY_ALL);
-
-        $this->assertInstanceOf(Output::class, $result);
-        $this->assertSame($this->output, $result);
-    }
-
     public function testEmptyOutput(): void
     {
         $string = (string) $this->output;
@@ -102,7 +85,7 @@ class OutputTest extends TestCase
     public function testVerbosityNoneLevel(): void
     {
         $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Output::VERBOSITY_NONE);
+        $output->setVerbosity(Verbosity::NONE);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -126,7 +109,7 @@ class OutputTest extends TestCase
     public function testVerbosityStepLevel(): void
     {
         $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Output::VERBOSITY_STEP);
+        $output->setVerbosity(Verbosity::STEP);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -154,7 +137,7 @@ class OutputTest extends TestCase
     public function testVerbosityErrorLevel(): void
     {
         $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Output::VERBOSITY_ERROR);
+        $output->setVerbosity(Verbosity::ERROR);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -182,7 +165,7 @@ class OutputTest extends TestCase
     public function testVerbosityWarnLevel(): void
     {
         $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Output::VERBOSITY_WARN);
+        $output->setVerbosity(Verbosity::WARN);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -210,7 +193,7 @@ class OutputTest extends TestCase
     public function testVerbosityInfoLevel(): void
     {
         $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Output::VERBOSITY_INFO);
+        $output->setVerbosity(Verbosity::INFO);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -238,7 +221,7 @@ class OutputTest extends TestCase
     public function testVerbosityAllLevel(): void
     {
         $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Output::VERBOSITY_ALL);
+        $output->setVerbosity(Verbosity::ALL);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -266,7 +249,7 @@ class OutputTest extends TestCase
     public function testToFileWithVerbosity(): void
     {
         $output = new Output('');
-        $output->setVerbosity(Output::VERBOSITY_WARN);
+        $output->setVerbosity(Verbosity::WARN);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -306,7 +289,7 @@ class OutputTest extends TestCase
     public function testHelperMethods(): void
     {
         $output = new Output('');
-        $output->setVerbosity(Output::VERBOSITY_ALL);
+        $output->setVerbosity(Verbosity::ALL);
 
         $output->step('Step message');
         $output->error('Error message');
@@ -327,7 +310,7 @@ class OutputTest extends TestCase
     public function testCustomTags(): void
     {
         $output = new Output('');
-        $output->setVerbosity(Output::VERBOSITY_ALL);
+        $output->setVerbosity(Verbosity::ALL);
 
         $output->add('Custom message', 'custom');
         $output->add('Debug message', 'debug');
@@ -346,7 +329,7 @@ class OutputTest extends TestCase
     public function testCustomTagsWithZeroVerbosity(): void
     {
         $output = new Output('');
-        $output->setVerbosity(Output::VERBOSITY_NONE);
+        $output->setVerbosity(Verbosity::NONE);
 
         $output->add('Custom message', 'custom');
         $output->add('Debug message', 'debug');

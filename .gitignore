@@ -1,5 +1,7 @@
 composer.lock
-package-lock.json
-.phpunit.cache/
-vendor/
+/vendor/
+
+/.phpunit.cache/
+/coverage/
+
 examples/output.txt

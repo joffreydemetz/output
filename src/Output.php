@@ -1,28 +1,18 @@
 <?php
 
 /**
- * (c) Joffrey Demetz <joffrey.demetz@gmail.com>
- * 
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
+ * @author    Joffrey Demetz <joffrey.demetz@gmail.com>
+ * @license   MIT License; <https://opensource.org/licenses/MIT>
  */
 
 namespace JDZ\Output;
 
-/**
- * @author  Joffrey Demetz <joffrey.demetz@gmail.com>
- */
+use JDZ\Output\Verbosity;
+
 class Output
 {
-  public const VERBOSITY_NONE = 0;
-  public const VERBOSITY_STEP = 1;
-  public const VERBOSITY_ERROR = 4;
-  public const VERBOSITY_WARN = 8;
-  public const VERBOSITY_INFO = 16;
-  public const VERBOSITY_ALL = 32;
-
   private string $mode;
-  private int $verbosity = self::VERBOSITY_ALL;
+  private Verbosity $verbosity = Verbosity::ALL;
   private array $output = []; // output messages based on verbosity
   private array $dump = [];   // all messages regardless of verbosity
 
@@ -39,10 +29,18 @@ class Output
     return $this->toString();
   }
 
-  public function setVerbosity(int $verbosity = 0): self
+  public function setVerbosity(Verbosity|int $verbosity): self
   {
-    $this->verbosity = $verbosity;
+    $this->verbosity = $verbosity instanceof Verbosity
+      ? $verbosity
+      : Verbosity::from($verbosity);
+
     return $this;
+  }
+
+  public function getVerbosity(): Verbosity
+  {
+    return $this->verbosity;
   }
 
   public function toString(bool $all = false): string
@@ -83,35 +81,21 @@ class Output
 
     $this->dump[] = $output;
 
-    if (!$this->verbosity) {
+    if ($this->verbosity === Verbosity::NONE) {
       return;
     }
 
-    if ($tag === 'step') {
-      if ($this->verbosity < self::VERBOSITY_STEP) {
-        return;
-      }
-    } elseif ($tag === 'error') {
-      if ($this->verbosity < self::VERBOSITY_ERROR) {
-        return;
-      }
-    } elseif ($tag === 'warn') {
-      if ($this->verbosity < self::VERBOSITY_WARN) {
-        return;
-      }
-    } elseif ($tag === 'info') {
-      if ($this->verbosity < self::VERBOSITY_INFO) {
-        return;
-      }
-    } elseif ($tag === 'dump') {
-      if ($this->verbosity < self::VERBOSITY_ALL) {
-        return;
-      }
-    } else {
-      // Allow any other tag to pass through
-      if ($this->verbosity === self::VERBOSITY_NONE) {
-        return;
-      }
+    $shouldOutput = match ($tag) {
+      'step' => $this->verbosity->includes(Verbosity::STEP),
+      'error' => $this->verbosity->includes(Verbosity::ERROR),
+      'warn' => $this->verbosity->includes(Verbosity::WARN),
+      'info' => $this->verbosity->includes(Verbosity::INFO),
+      'dump' => $this->verbosity->includes(Verbosity::ALL),
+      default => $this->verbosity !== Verbosity::NONE,
+    };
+
+    if (!$shouldOutput) {
+      return;
     }
 
     $this->output[] = $output;
@@ -121,27 +105,27 @@ class Output
     }
   }
 
-  public function step(string $message)
+  public function step(string $message): void
   {
     $this->add($message, 'step');
   }
 
-  public function error(string $message)
+  public function error(string $message): void
   {
     $this->add($message, 'error');
   }
 
-  public function warn(string $message)
+  public function warn(string $message): void
   {
     $this->add($message, 'warn');
   }
 
-  public function info(string $message)
+  public function info(string $message): void
   {
     $this->add($message, 'info');
   }
 
-  public function dump(string $message)
+  public function dump(string $message): void
   {
     $this->add($message, 'dump');
   }
