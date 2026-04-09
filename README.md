@@ -23,7 +23,7 @@ composer require jdz/output
 
 ## Requirements
 
-- PHP 8.1 or higher
+- PHP >= 8.2
 
 ## Quick Start
 
@@ -318,7 +318,7 @@ Run the test suite:
 composer test
 
 # Run with coverage
-composer test -- --coverage-html coverage
+composer test-coverage
 
 # Run specific test file
 vendor/bin/phpunit tests/OutputTest.php
