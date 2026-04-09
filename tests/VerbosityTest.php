@@ -3,11 +3,10 @@
 namespace JDZ\Output\Tests;
 
 use JDZ\Output\Verbosity;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \JDZ\Output\Verbosity
- */
+#[CoversClass(Verbosity::class)]
 class VerbosityTest extends TestCase
 {
     public function testEnumCases(): void

@@ -4,11 +4,10 @@ namespace JDZ\Output\Tests;
 
 use JDZ\Output\Output;
 use JDZ\Output\Verbosity;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \JDZ\Output\Output
- */
+#[CoversClass(Output::class)]
 class OutputTest extends TestCase
 {
     private Output $output;
