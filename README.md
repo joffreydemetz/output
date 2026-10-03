@@ -2,6 +2,8 @@
 
 A lightweight PHP library for handling process output with different verbosity levels and formatting options. Perfect for CLI applications, logging, and process monitoring.
 
+> **Upgrading from 1.x:** 2.0.0 replaced the `Output::VERBOSITY_*` class constants with the `Verbosity` enum. `setVerbosity()` still accepts the integer values (`0`, `1`, `4`, `8`, `16`, `32`), so `Output::VERBOSITY_WARN` becomes `Verbosity::WARN` (or `8`). Code that still uses the constants must stay on `^1.0`.
+
 ## Features
 
 - **Multiple output types**: step, info, warn, error, and dump messages
@@ -83,9 +85,6 @@ $output->setVerbosity(Verbosity::ALL); // default
 
 // Using integer value (backward compatible)
 $output->setVerbosity(8);  // Same as Verbosity::WARN
-
-// Using constants (backward compatible)
-$output->setVerbosity(Verbosity::WARN); // Same as 8
 
 // Get current verbosity level
 $level = $output->getVerbosity(); // Returns Verbosity enum
@@ -334,7 +333,12 @@ This library is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Changelog
 
+### Version 2.0.1
+- Requires PHP >= 8.2
+- PHPUnit 11
+
 ### Version 2.0.0
+- **Breaking:** the `Output::VERBOSITY_*` constants are gone — use the `Verbosity` enum (or its integer values)
 - Added PHP 8.1+ backed enum for type-safe verbosity levels
 - Added `Verbosity::includes()` method for hierarchy checking
 - Added `Verbosity::description()` method for human-readable descriptions
