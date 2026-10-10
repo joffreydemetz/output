@@ -68,7 +68,10 @@ class Output
     $dump = $this->toString($all);
 
     try {
-      file_put_contents($path, $dump);
+      // a failed write is a warning and false, not an exception
+      if (false === @file_put_contents($path, $dump)) {
+        throw new \RuntimeException('cannot write ' . $path);
+      }
       chmod($path, 0777);
     } catch (\Throwable $e) {
       throw new \RuntimeException('Error dumping output: ' . $e->getMessage(), 0, $e);
@@ -77,7 +80,8 @@ class Output
 
   public function add(string $message, string $tag = 'info'): void
   {
-    $output = str_pad('[' . strtoupper($tag) . ']', 8, ' ', STR_PAD_RIGHT) . $message;
+    // aligned on 8 columns, and never glued to the message (a 6+ letter tag was)
+    $output = str_pad('[' . strtoupper($tag) . ']', 7, ' ', STR_PAD_RIGHT) . ' ' . $message;
 
     $this->dump[] = $output;
 

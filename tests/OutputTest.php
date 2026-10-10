@@ -144,4 +144,32 @@ class OutputTest extends TestCase
 
         (new Output(''))->toFile($path);
     }
+
+    /**
+     * file_put_contents() fails with a warning and false, not an exception: a
+     * failed write used to pass silently.
+     */
+    public function testToFileThrowsWhenTheWriteFails(): void
+    {
+        $path = $this->tempDir() . '/a-folder';
+        mkdir($path);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Error dumping output: cannot write ' . $path);
+
+        (new Output(''))->toFile($path);
+    }
+
+    /**
+     * The tag was padded to 8 characters: a tag of six letters or more was glued
+     * to its message ("[CUSTOM]Custom message").
+     */
+    public function testALongTagIsSeparatedFromItsMessage(): void
+    {
+        $output = new Output('');
+        $output->add('Custom message', 'custom');
+        $output->add('Info message');
+
+        $this->assertSame("[CUSTOM] Custom message\n[INFO]  Info message", $output->toString());
+    }
 }
