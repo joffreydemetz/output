@@ -5,342 +5,143 @@ namespace JDZ\Output\Tests;
 use JDZ\Output\Output;
 use JDZ\Output\Verbosity;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Output::class)]
 class OutputTest extends TestCase
 {
-    private Output $output;
+    private const ALL_LINES = [
+        '[STEP]  Step message',
+        '[ERROR] Error message',
+        '[WARN]  Warning message',
+        '[INFO]  Info message',
+        '[DUMP]  Debug message',
+        '[NOTE]  Custom message',
+    ];
 
-    protected function setUp(): void
+    private ?string $dir = null;
+
+    protected function tearDown(): void
     {
-        // mode '' buffers without echoing (the auto-detected CLI mode echoes every add())
-        $this->output = new Output('');
+        if (null !== $this->dir) {
+            foreach (glob($this->dir . '/*') ?: [] as $file) {
+                is_dir($file) ? rmdir($file) : unlink($file);
+            }
+            rmdir($this->dir);
+        }
     }
 
-    public function testConstructor(): void
+    private function tempDir(): string
     {
-        $output = new Output('');
-        $this->assertInstanceOf(Output::class, $output);
+        $this->dir ??= sys_get_temp_dir() . '/jdz-output-' . bin2hex(random_bytes(6));
+        if (!is_dir($this->dir)) {
+            mkdir($this->dir);
+        }
+
+        return $this->dir;
     }
 
-    public function testAddMessage(): void
+    /** one message through every helper, plus a custom tag; mode '' buffers without echoing */
+    private static function filled(Verbosity|int $verbosity): Output
     {
-        $this->output->add('Test message');
-        $string = (string) $this->output;
-        $this->assertStringContainsString('[INFO]  Test message', $string);
-    }
-
-    public function testAddMessageWithTag(): void
-    {
-        $this->output->add('Error message', 'error');
-        $string = (string) $this->output;
-        $this->assertStringContainsString('[ERROR] Error message', $string);
-    }
-
-    public function testAddMultipleMessages(): void
-    {
-        $this->output->add('First message', 'info');
-        $this->output->add('Second message', 'warn');
-        $this->output->add('Third message', 'error');
-
-        $string = (string) $this->output;
-        $this->assertStringContainsString('[INFO]  First message', $string);
-        $this->assertStringContainsString('[WARN]  Second message', $string);
-        $this->assertStringContainsString('[ERROR] Third message', $string);
-    }
-
-    public function testToString(): void
-    {
-        $this->output->add('Test message 1');
-        $this->output->add('Test message 2');
-
-        $string = (string) $this->output;
-        $lines = explode("\n", $string);
-
-        $this->assertCount(2, $lines);
-        $this->assertEquals('[INFO]  Test message 1', $lines[0]);
-        $this->assertEquals('[INFO]  Test message 2', $lines[1]);
-    }
-
-    public function testEmptyOutput(): void
-    {
-        $string = (string) $this->output;
-        $this->assertEquals('', $string);
-    }
-
-    public function testToFile(): void
-    {
-        $filePath = __DIR__ . '/output.txt';
-        $this->output->add('File output test');
-        $this->output->toFile($filePath);
-
-        $this->assertFileExists($filePath);
-        $content = file_get_contents($filePath);
-        $this->assertStringContainsString('[INFO]  File output test', $content);
-
-        unlink($filePath); // Clean up
-    }
-
-    public function testVerbosityNoneLevel(): void
-    {
-        $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Verbosity::NONE);
-
+        $output = (new Output(''))->setVerbosity($verbosity);
         $output->step('Step message');
         $output->error('Error message');
         $output->warn('Warning message');
         $output->info('Info message');
         $output->dump('Debug message');
+        $output->add('Custom message', 'note');
 
-        // Filtered output should be empty when verbosity is NONE
-        $filteredString = $output->toString(false);
-        $this->assertEquals('', $filteredString);
-
-        // But all messages should still be available in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[STEP]  Step message', $allString);
-        $this->assertStringContainsString('[ERROR] Error message', $allString);
-        $this->assertStringContainsString('[WARN]  Warning message', $allString);
-        $this->assertStringContainsString('[INFO]  Info message', $allString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allString);
+        return $output;
     }
 
-    public function testVerbosityStepLevel(): void
+    public static function verbosities(): array
     {
-        $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Verbosity::STEP);
+        [$step, $error, $warn, $info, $dump, $custom] = self::ALL_LINES;
 
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
-
-        // Only step messages should pass through at STEP level
-        $filteredString = $output->toString(false);
-        $this->assertStringContainsString('[STEP]  Step message', $filteredString);
-        $this->assertStringNotContainsString('[ERROR] Error message', $filteredString);
-        $this->assertStringNotContainsString('[WARN]  Warning message', $filteredString);
-        $this->assertStringNotContainsString('[INFO]  Info message', $filteredString);
-        $this->assertStringNotContainsString('[DUMP]  Debug message', $filteredString);
-
-        // But all messages should still be available in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[STEP]  Step message', $allString);
-        $this->assertStringContainsString('[ERROR] Error message', $allString);
-        $this->assertStringContainsString('[WARN]  Warning message', $allString);
-        $this->assertStringContainsString('[INFO]  Info message', $allString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allString);
+        return [
+            'NONE' => [Verbosity::NONE, []],
+            'STEP' => [Verbosity::STEP, [$step, $custom]],
+            'ERROR' => [Verbosity::ERROR, [$step, $error, $custom]],
+            'WARN' => [Verbosity::WARN, [$step, $error, $warn, $custom]],
+            'INFO' => [Verbosity::INFO, [$step, $error, $warn, $info, $custom]],
+            'ALL' => [Verbosity::ALL, self::ALL_LINES],
+            'set as an int' => [8, [$step, $error, $warn, $custom]],
+        ];
     }
 
-    public function testVerbosityErrorLevel(): void
+    /**
+     * The filtered output keeps the tags the verbosity includes (a custom tag
+     * passes unless the verbosity is NONE); the full dump keeps everything.
+     */
+    #[DataProvider('verbosities')]
+    public function testTheVerbosityFiltersTheOutputNotTheDump(Verbosity|int $verbosity, array $lines): void
     {
-        $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Verbosity::ERROR);
+        $output = self::filled($verbosity);
 
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
-
-        // Step and error messages should pass through at ERROR level
-        $filteredString = $output->toString(false);
-        $this->assertStringContainsString('[STEP]  Step message', $filteredString);
-        $this->assertStringContainsString('[ERROR] Error message', $filteredString);
-        $this->assertStringNotContainsString('[WARN]  Warning message', $filteredString);
-        $this->assertStringNotContainsString('[INFO]  Info message', $filteredString);
-        $this->assertStringNotContainsString('[DUMP]  Debug message', $filteredString);
-
-        // All messages should be available in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[STEP]  Step message', $allString);
-        $this->assertStringContainsString('[ERROR] Error message', $allString);
-        $this->assertStringContainsString('[WARN]  Warning message', $allString);
-        $this->assertStringContainsString('[INFO]  Info message', $allString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allString);
+        $this->assertSame(implode("\n", $lines), $output->toString());
+        $this->assertSame(implode("\n", $lines), (string) $output);
+        $this->assertSame(implode("\n", self::ALL_LINES), $output->toString(true));
     }
 
-    public function testVerbosityWarnLevel(): void
+    public function testTheVerbosityIsAllByDefault(): void
     {
-        $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Verbosity::WARN);
-
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
-
-        // Step, error, and warn messages should pass through at WARN level
-        $filteredString = $output->toString(false);
-        $this->assertStringContainsString('[STEP]  Step message', $filteredString);
-        $this->assertStringContainsString('[ERROR] Error message', $filteredString);
-        $this->assertStringContainsString('[WARN]  Warning message', $filteredString);
-        $this->assertStringNotContainsString('[INFO]  Info message', $filteredString);
-        $this->assertStringNotContainsString('[DUMP]  Debug message', $filteredString);
-
-        // All messages should be available in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[STEP]  Step message', $allString);
-        $this->assertStringContainsString('[ERROR] Error message', $allString);
-        $this->assertStringContainsString('[WARN]  Warning message', $allString);
-        $this->assertStringContainsString('[INFO]  Info message', $allString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allString);
+        $this->assertSame(Verbosity::ALL, (new Output(''))->getVerbosity());
+        $this->assertSame(Verbosity::INFO, (new Output(''))->setVerbosity(16)->getVerbosity());
     }
 
-    public function testVerbosityInfoLevel(): void
+    public function testAnUnknownVerbosityIsRefused(): void
     {
-        $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Verbosity::INFO);
+        $this->expectException(\ValueError::class);
 
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
-
-        // Step, error, warn, and info messages should pass through at INFO level
-        $filteredString = $output->toString(false);
-        $this->assertStringContainsString('[STEP]  Step message', $filteredString);
-        $this->assertStringContainsString('[ERROR] Error message', $filteredString);
-        $this->assertStringContainsString('[WARN]  Warning message', $filteredString);
-        $this->assertStringContainsString('[INFO]  Info message', $filteredString);
-        $this->assertStringNotContainsString('[DUMP]  Debug message', $filteredString);
-
-        // All messages should be available in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[STEP]  Step message', $allString);
-        $this->assertStringContainsString('[ERROR] Error message', $allString);
-        $this->assertStringContainsString('[WARN]  Warning message', $allString);
-        $this->assertStringContainsString('[INFO]  Info message', $allString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allString);
+        (new Output(''))->setVerbosity(2);
     }
 
-    public function testVerbosityAllLevel(): void
+    public function testTheCliModeEchoesEachShownMessage(): void
     {
-        $output = new Output(''); // Non-CLI to avoid console output
-        $output->setVerbosity(Verbosity::ALL);
+        $output = (new Output('cli'))->setVerbosity(Verbosity::ERROR);
 
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
+        $this->expectOutputString("[STEP]  Started\n[ERROR] Failed\n");
 
-        // All messages should pass through at ALL level
-        $filteredString = $output->toString(false);
-        $this->assertStringContainsString('[STEP]  Step message', $filteredString);
-        $this->assertStringContainsString('[ERROR] Error message', $filteredString);
-        $this->assertStringContainsString('[WARN]  Warning message', $filteredString);
-        $this->assertStringContainsString('[INFO]  Info message', $filteredString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $filteredString);
-
-        // All messages should also be available in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[STEP]  Step message', $allString);
-        $this->assertStringContainsString('[ERROR] Error message', $allString);
-        $this->assertStringContainsString('[WARN]  Warning message', $allString);
-        $this->assertStringContainsString('[INFO]  Info message', $allString);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allString);
+        $output->step('Started');
+        $output->error('Failed');
+        $output->info('Not shown');
     }
 
-    public function testToFileWithVerbosity(): void
+    public function testTheModeIsCliWhenRunFromTheCommandLine(): void
     {
-        $output = new Output('');
-        $output->setVerbosity(Verbosity::WARN);
+        $this->expectOutputString("[INFO]  Hello\n");
 
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
-
-        // Test filtered output to file
-        $filteredPath = __DIR__ . '/filtered_output.txt';
-        $output->toFile($filteredPath, false);
-
-        $this->assertFileExists($filteredPath);
-        $filteredContent = file_get_contents($filteredPath);
-        $this->assertStringContainsString('[STEP]  Step message', $filteredContent);
-        $this->assertStringContainsString('[ERROR] Error message', $filteredContent);
-        $this->assertStringContainsString('[WARN]  Warning message', $filteredContent);
-        $this->assertStringNotContainsString('[INFO]  Info message', $filteredContent);
-        $this->assertStringNotContainsString('[DUMP]  Debug message', $filteredContent);
-
-        // Test all output to file
-        $allPath = __DIR__ . '/all_output.txt';
-        $output->toFile($allPath, true);
-
-        $this->assertFileExists($allPath);
-        $allContent = file_get_contents($allPath);
-        $this->assertStringContainsString('[STEP]  Step message', $allContent);
-        $this->assertStringContainsString('[ERROR] Error message', $allContent);
-        $this->assertStringContainsString('[WARN]  Warning message', $allContent);
-        $this->assertStringContainsString('[INFO]  Info message', $allContent);
-        $this->assertStringContainsString('[DUMP]  Debug message', $allContent);
-
-        // Clean up
-        unlink($filteredPath);
-        unlink($allPath);
+        (new Output())->info('Hello');
     }
 
-    public function testHelperMethods(): void
+    public function testToFileWritesTheFilteredOrTheFullOutput(): void
     {
-        $output = new Output('');
-        $output->setVerbosity(Verbosity::ALL);
+        $dir = $this->tempDir();
+        $output = self::filled(Verbosity::WARN);
 
-        $output->step('Step message');
-        $output->error('Error message');
-        $output->warn('Warning message');
-        $output->info('Info message');
-        $output->dump('Debug message');
+        $output->toFile($dir . '/filtered.log');
+        $output->toFile($dir . '/all.log', true);
 
-        $string = $output->toString(false);
-
-        // Test that helper methods work correctly
-        $this->assertStringContainsString('[STEP]  Step message', $string);
-        $this->assertStringContainsString('[ERROR] Error message', $string);
-        $this->assertStringContainsString('[WARN]  Warning message', $string);
-        $this->assertStringContainsString('[INFO]  Info message', $string);
-        $this->assertStringContainsString('[DUMP]  Debug message', $string);
+        $this->assertSame($output->toString(), file_get_contents($dir . '/filtered.log'));
+        $this->assertSame($output->toString(true), file_get_contents($dir . '/all.log'));
     }
 
-    public function testCustomTags(): void
+    public static function invalidPaths(): array
     {
-        $output = new Output('');
-        $output->setVerbosity(Verbosity::ALL);
-
-        $output->add('Custom message', 'custom');
-        $output->add('Debug message', 'debug');
-
-        // Custom tags should pass through when verbosity > 0
-        $filteredString = $output->toString(false);
-        $this->assertStringContainsString('[CUSTOM]Custom message', $filteredString);
-        $this->assertStringContainsString('[DEBUG] Debug message', $filteredString);
-
-        // And should always be in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[CUSTOM]Custom message', $allString);
-        $this->assertStringContainsString('[DEBUG] Debug message', $allString);
+        return [
+            'an empty path' => [''],
+            'a missing folder' => ['/jdz-output-no-such-folder/sub/out.log'],
+        ];
     }
 
-    public function testCustomTagsWithZeroVerbosity(): void
+    #[DataProvider('invalidPaths')]
+    public function testToFileRefusesAPathItCannotWrite(string $path): void
     {
-        $output = new Output('');
-        $output->setVerbosity(Verbosity::NONE);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Dump output path is not valid.');
 
-        $output->add('Custom message', 'custom');
-        $output->add('Debug message', 'debug');
-
-        // Custom tags should not pass through when verbosity is 0
-        $filteredString = $output->toString(false);
-        $this->assertEquals('', $filteredString);
-
-        // But should still be in dump
-        $allString = $output->toString(true);
-        $this->assertStringContainsString('[CUSTOM]Custom message', $allString);
-        $this->assertStringContainsString('[DEBUG] Debug message', $allString);
+        (new Output(''))->toFile($path);
     }
 }
