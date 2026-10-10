@@ -333,6 +333,10 @@ This library is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Changelog
 
+### Version 2.0.2
+- `toFile()` throws a `RuntimeException` when the write fails (it used to pass silently)
+- A tag of six letters or more is separated from its message (`[CUSTOM] message`, it was glued)
+
 ### Version 2.0.1
 - Requires PHP >= 8.2
 - PHPUnit 11
