@@ -14,12 +14,13 @@ class OutputTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->output = new Output();
+        // mode '' buffers without echoing (the auto-detected CLI mode echoes every add())
+        $this->output = new Output('');
     }
 
     public function testConstructor(): void
     {
-        $output = new Output();
+        $output = new Output('');
         $this->assertInstanceOf(Output::class, $output);
     }
 
